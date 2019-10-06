@@ -1,10 +1,10 @@
 <?php
 /*
- Plugin Name: Wordpress Automatic Plugin
+ Plugin Name: Hyp Automatic
  Plugin URI: https://github.com/hypericumimpex/hyp-autopost/
- Description: WordPress Automatic posts quality articles, Amazon products, Clickbank products, Youtube videos, eBay items, Flickr images, RSS feeds posts on auto-pilot and much more.
+ Description: Automatic posts quality articles, Amazon products, Clickbank products, Youtube videos, eBay items, Flickr images, RSS feeds posts on auto-pilot and much more.
  Version: 3.46.4
- Author: ValvePress
+ Author: Hypericum
  Author URI: https://github.com/hypericumimpex/hyp-autopost?ref=HYP
  */
 
