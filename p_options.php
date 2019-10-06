@@ -69,7 +69,7 @@ function gm_setting() {
 		}
 		
 		$resarr=json_decode($resback);
-		$resarr->message = 'success';
+		
 		if(isset($resarr->message)){
 			$wp_automatic_active_message=$resarr->message;
 			
@@ -986,7 +986,7 @@ h2 span{
 									<!--start container-->
  
  									<?php 
- 									if(trim($licenseactive) ==''){
+ 									if(trim($licenseactive) =='' || isset($_GET['show_license'])){
  									
  									?>
  										

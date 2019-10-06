@@ -31,7 +31,6 @@ class wp_automatic_amazon_api_less {
 	public $is_next_page_available = false;
 	function __construct(&$ch, $region) {
 		$this->ch = $ch;
-		$this->associate_tag = $ass;
 		$this->region = $region;
 	}
 	
@@ -45,13 +44,15 @@ class wp_automatic_amazon_api_less {
 	public function getItemByAsin($asin_code) {
 		
 		//save timing limit
-		sleep(rand(1,3));
+		sleep(rand(3,5));
 		
 		// trim asin
 		$asin_code = trim ( $asin_code );
 		
 		// item URL
 		$item_url = "https://www.amazon.{$this->region}/dp/$asin_code";
+		
+		echo '<br>Item link:' . $item_url;
 		
 		// load the item page
 		$x = 'error';
@@ -67,10 +68,26 @@ class wp_automatic_amazon_api_less {
 			throw new Exception ( 'No valid reply returned from Amazon with a possible cURL err ' . $x );
 		}
 		
+		if(stristr($exec,'/captcha/')){
+			echo '<br>Amazon asked for Capacha... will die now and try next run';
+			exit;
+			throw new Exception ( 'Amazon asked for Capacha ' . $x );
+		}
+		
 		// validate returned result
 		if (! stristr ( $exec, $asin_code )) {
+			
+			echo $exec;
+			
 			throw new Exception ( 'No valid reply returned from Amazon can not find the item asin' );
+			
 		}
+		
+		
+		//fix for eur getiting defected for amazon.it
+		$exec = str_replace('iso-8859-1' , 'utf-8' , $exec );
+		
+		
 		
 		// dom
 		$doc = new DOMDocument ();
@@ -88,6 +105,8 @@ class wp_automatic_amazon_api_less {
 			$item_title = trim ( $title_element->nodeValue );
 		}
  		
+		 
+		
 		$ret['link_title'] = $item_title;
 		
 		// the description productDescription
@@ -188,18 +207,26 @@ class wp_automatic_amazon_api_less {
 		 
 		
 		$ret['item_images'] = $item_images;
+		
 		 
 		// prices priceblock_ourprice
-		if(stristr($exec,'priceblock_dealprice')){
+		if(stristr($exec,'id="priceblock_dealprice')){
 			$elements = $xpath->query ( '//*[@id="priceblock_dealprice"]' );
-		}elseif( stristr($exec,'priceblock_ourprice') ){
+		}elseif( stristr($exec,'id="priceblock_ourprice') ){
 			$elements = $xpath->query ( '//*[@id="priceblock_ourprice"]' );
-		} 
+		}elseif( stristr($exec,'id="priceblock_saleprice') ){
+			$elements = $xpath->query ( '//*[@id="priceblock_saleprice"]' );
+		}elseif(stristr($exec,'id="price_inside_buybox')){
+			$elements = $xpath->query ( '//*[@id="price_inside_buybox"]' );
+		}
 		
-		 	
+		
+		
+ 		 	
 		$item_price = '';
 		if ($elements->length > 0) {
 			$item_price = trim ( $elements->item(0)->nodeValue );
+			 
 			$item_price = preg_replace('{ -.*}' , '' , $item_price);
 		}elseif(stristr($exec,'offer-price')){
 			
@@ -284,6 +311,9 @@ class wp_automatic_amazon_api_less {
 		if (! stristr ( $exec, 'data-asin' )) {
 			// throw new Exception('No items found') ;
 			echo '<br>No items found';
+			
+			echo $exec;
+			
 			return array ();
 		}
 		
@@ -316,7 +346,7 @@ class wp_automatic_amazon_api_less {
 	public function getASINs($moreUrl ) {
 		
 		//save timing limit
-		sleep(rand(1,3));
+		sleep(rand(3,5));
 		
 		// curl get
 		$x = 'error';
@@ -336,14 +366,17 @@ class wp_automatic_amazon_api_less {
 		
 		// Capacha check
 		if(stristr($exec,'/captcha/')){
-			echo '<br>Amazon asked for Capacha...';
-			throw new Exception ( 'Amazon asked for Capacha ' . $x );
+			echo '<br>Amazon asked for Capacha..  will die now and try next run.';
+			exit;
 		}
 		
 		// validate products found
 		if (! stristr ( $exec, 'data-asin' )) {
 			// throw new Exception('No items found') ;
 			echo '<br>No items found';
+			
+			echo $exec;
+			
 			return array ();
 		}
 		

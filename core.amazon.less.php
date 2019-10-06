@@ -89,7 +89,7 @@ Class WpAutomaticAmazon extends wp_automatic{
 						$asin = $t_link_url;
 						
 						echo '<br>Found ASIN:'.$asin.' getting complete details from Amazon...';
-					  
+					 
 						$amazonAid = get_option ( 'wp_amazonpin_aaid', '' );
 						
 						require_once ( dirname(__FILE__) . '/inc/class.amazon.api.less.php');
@@ -98,7 +98,12 @@ Class WpAutomaticAmazon extends wp_automatic{
  						try {
 							
  							$this->simulate_location( $camp->camp_amazon_region);
-							$item = $obj->getItemByAsin($asin);
+							
+ 							$agent = $this->randomUserAgent();
+ 							echo '<br>Agent:'. $agent;
+ 							curl_setopt ( $this->ch, CURLOPT_USERAGENT, $agent );
+ 							
+ 							$item = $obj->getItemByAsin($asin);
 							
 							
 						} catch (Exception $e) {
@@ -107,6 +112,7 @@ Class WpAutomaticAmazon extends wp_automatic{
 						
 						if(  isset($item['link_title']) && trim($item['item_price']) == '' ){
 							echo '<-- Can not find price, let us delete this product and try next run ';	
+							 
 						}
 						
 						if( isset($item['link_title']) && trim($item['item_price']) != ''  ){
@@ -520,16 +526,21 @@ Class WpAutomaticAmazon extends wp_automatic{
 					}
 					
 				}else{
-
-					$moreUrl = "https://www.amazon.{$camp->camp_amazon_region}/s?k="  . urlencode( trim($keyword) ) .  "&qid=1563641454&ref=sr_pg_2";
-					
+					if($scrapePage == 1){
+						$moreUrl = "https://www.amazon.{$camp->camp_amazon_region}/s?k="  . urlencode( trim($keyword) ) .  "&ref=nb_sb_noss_2";
+					}else{
+						$moreUrl = "https://www.amazon.{$camp->camp_amazon_region}/s?k="  . urlencode( trim($keyword) ) .  "&qid=1569443499&ref=sr_pg_2";
+					}
 				}
 				
 			
 			}
 		 	
-			$scrapeURL = $moreUrl.'&page='.$scrapePage;
-			 
+			if($scrapePage != 1){
+				$scrapeURL = $moreUrl.'&page='.$scrapePage;
+			}else{
+				$scrapeURL = $moreUrl;
+			}
 			
 			//high price and low price
 			if(in_array('OPT_AM_PRICE', $camp_opt)){
@@ -569,6 +580,9 @@ Class WpAutomaticAmazon extends wp_automatic{
 			try {
 				
 				$this->simulate_location( $camp->camp_amazon_region);
+				$agent = $this->randomUserAgent();
+				echo '<br>Agent:'. $agent;
+				curl_setopt ( $this->ch, CURLOPT_USERAGENT, $agent );
 				$ASINs = $obj->getASINs($scrapeURL);
 				
 				foreach ($ASINs as $ASIN){

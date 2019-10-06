@@ -835,13 +835,7 @@
 									 
 									if(! stristr($singleLink, 'twitter.com')  && ! ( $leave_external  && ! stristr($singleLink_no_images , $source_domain) )  ){
 										$abcont = str_replace($singleLink, $allLinksTexts[$j], $abcont);
-										
-										echo ' replacing...........'.$source_domain;
-									
 									}
-									
-									
-							
 							
 							$j++;
 						}
@@ -2552,9 +2546,10 @@
 							if(in_array('OPT_THUMB_CLEAN' , $camp_opt   )){
 							
 								$clean_name = '';
-								
-								$clean_name =  sanitize_file_name( wp_trim_words( $post_title ,10 ,'')  );
-								 
+								$clean_name = $this->removeEmoji($post_title);
+								$clean_name = wp_trim_words( $clean_name ,10 ,'');
+								$clean_name =  sanitize_file_name(  $clean_name );
+ 								
 								if(trim($clean_name) != ""){
 										
 									//get the image extension \.\w{3}
@@ -3977,9 +3972,10 @@
 						wp_set_object_terms ($id, 'external', 'product_type');
 						
 						//_product_url
-						$camp_post_custom_k = array_merge ( $camp_post_custom_k , array('_product_url'));
-						$camp_post_custom_v = array_merge ( $camp_post_custom_v , array( $source_link ) );
-						
+						if(! in_array( '_product_url' , $camp_post_custom_k  )){
+							$camp_post_custom_k = array_merge ( $camp_post_custom_k , array('_product_url'));
+							$camp_post_custom_v = array_merge ( $camp_post_custom_v , array( $source_link ) );
+						}
 					}
 					
 					//TrueMag integration 
@@ -4805,8 +4801,6 @@
 			 */
 			function gtranslate($title, $content, $from, $to , $translationMethod = 'microsoftTranslator') {
 	
-			 
-				
 				$contains_bracket = stristr($content, '(' ) ? true : false ; 
 				 
 				$content = str_replace( '[' , '(' , $content);
@@ -6843,13 +6837,16 @@ return trim($arrAgents[$rand]);
 			 */
 			function fix_relative_paths($content,$url){
 				
-				 
-				
 				//fix images
 				$pars=parse_url($url);
 				$host = $pars['host'];
-				
+				$scheme = $pars['scheme'];
+				if($scheme != 'https') $scheme = 'http';
+
 				/*preg_match_all('{<img.*?src[\s]*=[\s]*["|\'](.*?)["|\'].*?>}is', $res['cont'] , $matches); */
+				
+				$content = str_replace('src="//', 'src="'. $scheme . '://', $content);
+				$content = str_replace('href="//', 'href="'. $scheme . '://', $content);
 				
 				preg_match_all('{(?:href|src)[\s]*=[\s]*["|\'](.*?)["|\'].*?>}is', $content , $matches);
 				$img_srcs =  ($matches[1]);
@@ -6871,21 +6868,63 @@ return trim($arrAgents[$rand]);
 						
 						if(preg_match('{^//}', $img_src)){
 							
-							$img_src = 'http:'.$img_src;
+							$img_src = $scheme . ':'.$img_src;
 							
 						}elseif( preg_match('{^/}', $img_src) ){
-							$img_src = 'http://'.$host.$img_src;
+							$img_src = $scheme . '://'.$host.$img_src;
 						}else{
-							$img_src = 'http://'.$host.'/'.$img_src;
+							$img_src = $scheme . '://'.$host.'/'.$img_src;
 						}
 						
 						
 						$reg_img = '{["|\'][\s]*'.preg_quote($original_src,'{').'[\s]*["|\']}s';
-						
 						$content = preg_replace( $reg_img, '"'.$img_src.'"', $content);
 						
 					}
 					
+				}
+				 
+				//Fix Srcset 
+				preg_match_all('{srcset[\s]*=[\s]*["|\'](.*?)["|\']}s' , $content , $srcset_matches );
+				
+				 
+				$srcset_matches_raw = $srcset_matches[0];
+				$srcset_matches_inner = $srcset_matches[1];
+  
+				$i = 0;
+				foreach($srcset_matches_raw as $srcset){
+					 
+					if( stristr($srcset , 'http:') ||  stristr($srcset , 'https:') ){
+						//valid
+					}else{
+						
+						//lets fix
+						$correct_srcset = $srcset_inner = $srcset_matches_inner[$i];
+						 
+						$srcset_inner_parts = explode(',' , $srcset_inner );
+						
+						foreach($srcset_inner_parts as $srcset_row){
+							
+							$srcset_row_parts = explode(' ', trim($srcset_row));
+							$img_src_raw = $img_src = $srcset_row_parts[0];
+							
+							if(preg_match('{^//}', $img_src)){
+								$img_src = $scheme . ':'.$img_src;
+							}elseif( preg_match('{^/}', $img_src) ){
+								$img_src = $scheme . '://'.$host.$img_src;
+							}else{
+								$img_src = $scheme . '://'.$host.'/'.$img_src;
+							}
+							
+							$srcset_row_correct = str_replace( $img_src_raw , $img_src , $srcset_row );
+							$correct_srcset = str_replace( $srcset_row , $srcset_row_correct  , $correct_srcset );
+							 
+						}
+						
+						$content = str_replace($srcset_inner , $correct_srcset , $content );
+					}
+					
+					$i++;
 				}
 				 
 				
@@ -6898,7 +6937,7 @@ return trim($arrAgents[$rand]);
 				return $content;
 				
 			}
-		
+		 
 			/**
 			 * return width of an image
 			 */
@@ -6926,6 +6965,8 @@ return trim($arrAgents[$rand]);
 						
 			}
 
+			
+			
 			/**
 			 * Auto fix lazy loading 
 			 * @param  $cont

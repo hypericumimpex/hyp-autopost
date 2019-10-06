@@ -244,6 +244,9 @@ add_shortcode( 'price_with_discount', 'wp_automatic_price_with_discount' );
 function wp_automatic_price_with_discount() {
 
 	global $post; 
+	
+	if(! isset($post->ID)) return;
+	
 	$pID = $post->ID;
 
 	$price = get_post_meta($pID,'product_price',1);
@@ -264,6 +267,8 @@ add_shortcode( 'price_update_date', 'wp_automatic_price_update_date' );
 function wp_automatic_price_update_date() {
 	
 	global $post;
+	
+	if(! isset($post->ID)) return;
 	$pID = $post->ID;
 	
 	$utc = get_post_meta($pID,'product_price_updated',1);

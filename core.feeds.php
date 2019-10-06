@@ -509,7 +509,10 @@ function feed_process_link($feed, $camp) {
  
 		//source domain
 		$res['source_domain'] = $parse_url = parse_url($url, PHP_URL_HOST );
-	 	 
+	 	
+		//encoded URL
+		$res['source_url_encoded'] = urlencode($url);
+		
 		// If empty content make content = title
 		if(trim($html) == ''){
 			if( trim($title) != '' ) $html =$title;
@@ -550,7 +553,7 @@ function feed_process_link($feed, $camp) {
 		
 		 
 		// original post content 
-		if (    in_array ( 'OPT_FEED_CUSTOM', $camp_opt ) ||  in_array ( 'OPT_FEED_CUSTOM_R', $camp_opt ) ||  in_array ( 'OPT_ORIGINAL_META', $camp_opt )  ||  in_array ( 'OPT_ORIGINAL_CATS', $camp_opt ) ||  in_array ( 'OPT_ORIGINAL_TAGS', $camp_opt )   ||  in_array ( 'OPT_ORIGINAL_AUTHOR', $camp_opt )  ||  in_array ( 'OPT_FEED_PTF', $camp_opt )  ||  in_array ( 'OPT_FEEDS_OG_IMG', $camp_opt )   || $og_title_enabled     ) {
+		if (  in_array('OPT_FULL_FEED',$camp_opt) ||   in_array ( 'OPT_FEED_CUSTOM', $camp_opt ) ||  in_array ( 'OPT_FEED_CUSTOM_R', $camp_opt ) ||  in_array ( 'OPT_ORIGINAL_META', $camp_opt )  ||  in_array ( 'OPT_ORIGINAL_CATS', $camp_opt ) ||  in_array ( 'OPT_ORIGINAL_TAGS', $camp_opt )   ||  in_array ( 'OPT_ORIGINAL_AUTHOR', $camp_opt )  ||  in_array ( 'OPT_FEED_PTF', $camp_opt )  ||  in_array ( 'OPT_FEEDS_OG_IMG', $camp_opt )   || $og_title_enabled     ) {
 		
 			echo '<br>Loading original post content ...';
 			
@@ -570,7 +573,7 @@ function feed_process_link($feed, $camp) {
 			$original_cont = $this->curl_exec_follow ( $this->ch );
 			$x = curl_error ( $this->ch );
 		 	
-			echo strlen($original_cont) . ' chars returned in ' . timer_stop() . ' seconds';
+			echo ' <--' . strlen($original_cont) . ' chars returned in ' . timer_stop() . ' seconds';
 			
 			//converting encoding
 			if(in_array('OPT_FEED_CONVERT_ENC', $camp_opt)  ){
@@ -579,58 +582,7 @@ function feed_process_link($feed, $camp) {
 			}
 			
 			//fix images
-			$pars=parse_url($url);
-			$host = $pars['host'];
-			$scheme = $pars['scheme'];
-			
-			if($scheme != 'https') $scheme = 'http';
-			
-			
-			/*preg_match_all('{<img.*?src[\s]*=[\s]*["|\'](.*?)["|\'].*?>}is', $res['cont'] , $matches); */
-			
-			$original_cont = str_replace('src="//', 'src="'. $scheme . '://', $original_cont);
-			
-			preg_match_all('{src[\s]*=[\s]*["|\'](.*?)["|\'].*?>}is', $original_cont , $matches);
-			
-			$img_srcs =  ($matches[1]);
-			
-			
-			foreach ($img_srcs as $img_src){
-				 
-				$original_src = $img_src;
-				
-				// ../ remove
-				if(stristr($img_src, '../')){
-					$img_src = str_replace('../', '', $img_src);
-				}
-				
-				if(stristr($img_src, 'http:') || stristr($img_src, 'www.') || stristr($img_src, 'https:')  || stristr($img_src, 'data:image') ){
-					//valid image
-				}else{
-					//not valid image i.e relative path starting with a / or not or //
-					$img_src = trim($img_src);
-					 
-					if(preg_match('{^//}', $img_src)){
-						
-						$img_src = $scheme . ':'.$img_src;
-						
-					}elseif( preg_match('{^/}', $img_src) ){
-						$img_src =  $scheme . '://'.$host.$img_src;
-					}else{
-						$img_src = $scheme . '://'.$host.'/'.$img_src;
-					}
-					
-					$reg_img = '{["|\'][\s]*'.preg_quote($original_src,'{').'[\s]*["|\']}s';
-					
-					$original_cont = preg_replace( $reg_img, '"'.$img_src.'"', $original_cont);
-					
-				}
-				
-			}
-			
-			//Fix relative links
-			$original_cont = str_replace('href="../', 'href="'.$scheme.'://'.$host.'/', $original_cont);
-			$original_cont = preg_replace('{href="/(\w)}', 'href="'.$scheme.'://'.$host.'/$1', $original_cont);
+			$original_cont = $this->fix_relative_paths($original_cont, $url);
 			
 			//fix lazy loading
 			if(in_array('OPT_FEED_LAZY',$camp_opt)){
@@ -837,9 +789,7 @@ function feed_process_link($feed, $camp) {
 					
 					if($cg_selector == 'xpath'){
 						$ret= $wpAutomaticDom->getContentByXPath( stripslashes( $cg_selecotr_data ) ,$inner);
-						
-					
-						
+						 
 					}elseif($cg_selector == 'class'){
 						$ret= $wpAutomaticDom->getContentByClass( $cg_selecotr_data,$inner);
 				 
@@ -868,7 +818,7 @@ function feed_process_link($feed, $camp) {
 						  echo '<br>Nothing found to extract for this rule' ;
 						  
 					}else{
-						  echo '<br>Rule  extracted ' . strlen($extract) .' charchters ';
+						  echo ' <-- ' . strlen($extract) .' chars extracted';
 						  $wholeFound = (trim($wholeFound) == '' ) ? $extract : $wholeFound.'<br>'.$extract;
 						  
 					}
@@ -959,46 +909,84 @@ function feed_process_link($feed, $camp) {
 		// Stripping content using id or class from $res[cont]
 		if(in_array('OPT_STRIP_CSS', $camp_opt)){
 				
-			 echo '<br>Stripping content using ';
+			 echo '<br>Stripping content using:- ';
 				
 			$cg_selector = $camp_general['cg_custom_strip_selector'];
 			$cg_selecotr_data = $camp_general['cg_feed_custom_strip_id'];
 			$cg_selecotr_data = array_filter($cg_selecotr_data);
 			
-			//dom class
-			require_once 'inc/sxmldom_simple_html_dom.php';
+			
+			
+			// Load dom
+			$final_doc = new DOMDocument();
+			
+			//getting encoding 
+			
+			preg_match_all('{charset=["|\']([^"]+?)["|\']}', $original_cont,$encMatches);
+			$possibleCharSet = $encMatches[1];
+			
+		 
+			
+			$possibleCharSet = isset($possibleCharSet[0]) ? $possibleCharSet[0] : '';
+			
+			if(trim($possibleCharSet) == '') $possibleCharSet = 'UTF-8';
+			
+			$charSetMeta = '<meta http-equiv="content-type" content="text/html; charset=' . $possibleCharSet . '"/>';
+			
+			$full_html =  '<head>'.$charSetMeta.'</head><body>'. $res['cont']  . '</body>' ;
+			$html_to_count = $full_html;
+			
+			@$final_doc->loadHTML( $full_html );
+			
+			$selector = new DOMXPath($final_doc);
+			
+			
+			$i=0;
+			$inner = false;
+			foreach ( $cg_selecotr_data as $cg_selector_data_single ){
 				
-			$original_html = sxmldom_str_get_html($res['cont']);
-				 
-			if(method_exists($original_html, 'find')){
+				echo '<br> - ' . $cg_selector[$i]. ' = "'.$cg_selector_data_single.'" ';
 				
-				$i=0;
-				foreach ( $cg_selecotr_data as $cg_selector_data_single ){
-					echo $cg_selector[$i]. ' = "'.$cg_selector_data_single.'" ';
+				if(trim($cg_selector_data_single) != '' ){
 					
-					if(trim($cg_selector_data_single) != ''){
-						$ret = $original_html->find('*['.$cg_selector[$i].'='.trim($cg_selector_data_single).']');
-						
-						foreach ($ret as $itm ) {
-							$itm->outertext = '' ;
-						}
-						
+					if($cg_selector[$i] == 'class'){
+						$query_final = '//*[contains(attribute::class, "' . trim($cg_selector_data_single) . '")]';
+					}elseif( $cg_selector[$i] == 'id'){
+						$query_final = "//*[@id='" .  trim($cg_selector_data_single) ."']";
 					}
 					
-					$i++;
+					$countBefore = $this->chars_count( $html_to_count );
+					
+					foreach($selector->query($query_final) as $e ) {
+						$e->parentNode->removeChild($e);
+					}
+					
+				 
+					$html_to_count = $final_doc->saveHTML($final_doc->documentElement);
+					
+					
+					$countAfter = $this->chars_count($res['cont']);
+					
+					echo '<-- '. (   $countBefore - $countAfter ) . ' chars removed';
+					
+					
 				}
+				
+				$i++;
+			}
+			
+			
+			$contentAfterReplacement = $final_doc->saveHTML($final_doc->documentElement);
+			$contentAfterReplacement = str_replace( array('<html>' , '</html>' , '<body>' , '</body>'  , $charSetMeta  ) , '' , $contentAfterReplacement  );
+			$contentAfterReplacement = preg_replace('{<head>.*?</head>}','' , $contentAfterReplacement );
+			
+			$res['cont'] = trim( $contentAfterReplacement );
 				 
 				//overwirte
-				$res ['matched_content'] = $res ['cont'] = $original_html->save();
- 
-				
-				$original_html->clear();
-				unset($original_html);
-				 
+				$res ['matched_content'] = $res ['cont'];
+  
 
-			}else{
-				  echo '<br>Can not parse final html to strip by id/class';
-			}
+			 
 				
 		}
 
@@ -1016,9 +1004,16 @@ function feed_process_link($feed, $camp) {
 
 					//$strip_pattern ='<img[^>]+\\>';
 
-					  echo '<br>Stripping:'.htmlentities($strip_pattern);
-					$current_content= preg_replace('{'.trim($strip_pattern).'}is', '', $current_content);
-						
+					  echo '<br>Stripping using REGEX:'.htmlentities($strip_pattern);
+					
+					  $countBefore = $this->chars_count( $current_content );
+					  
+					  $current_content= preg_replace('{'.trim($strip_pattern).'}is', '', $current_content);
+					
+					  $countAfter = $this->chars_count($current_content);
+					  
+					  echo ' <-- '. (   $countBefore - $countAfter ) . ' chars removed'; 
+					  
 					$current_title= preg_replace('{'.trim($strip_pattern).'}is', '', $current_title);
 
 				}
@@ -1169,41 +1164,41 @@ function feed_process_link($feed, $camp) {
 				
 				$cg_selector_cat=$camp_general['cg_custom_selector_cat'];
 				$cg_selecotr_data_cat=$camp_general['cg_feed_custom_id_cat'];
+				$inner = false;
 				
 				echo ' for '.$cg_selector_cat . ' = '.$cg_selecotr_data_cat;
 				
 		 
 				//dom class
-				require_once 'inc/sxmldom_simple_html_dom.php';
+				if(! isset($wpAutomaticDom)){
+					require_once 'inc/class.dom.php';
+					$wpAutomaticDom = new wpAutomaticDom($original_cont);
+				}
 				
-				$original_html_cat = sxmldom_str_get_html($original_cont);
 				
-				unset($ret);
-				if(method_exists($original_html_cat, 'find')){
+				if(1){
 					
-					if($cg_selector_cat != 'xpath'){
-						$ret = $original_html_cat->find('*['.$cg_selector_cat.'='.trim($cg_selecotr_data_cat).']');
-					}else{
-						$ret = $original_html_cat->find( trim($cg_selecotr_data_cat) );
-					}
+					
 					
 					$extract='';
 					
-					foreach ($ret as $itm ) {
-						
-						if(in_array('OPT_SELECTOR_INNER_CAT', $camp_opt)){
-							$extract = $extract . $itm->innertext ;
-						}else{
-							$extract = $extract . $itm->outertext ;
-						}
+					if ($cg_selector_cat == 'class') {
+						$extract = $wpAutomaticDom->getContentByClass ( $cg_selecotr_data_cat, $inner );
+					} elseif ($cg_selector_cat == 'id') {
+						$extract = $wpAutomaticDom->getContentByID ( $cg_selecotr_data_cat, $inner );
+					} elseif ($cg_selector_cat == 'xpath') {
+						$extract = $wpAutomaticDom->getContentByXPath ( stripslashes ( $cg_selecotr_data_cat ), $inner );
+					}
+					
+					if(is_array($extract)){
 						
 						if(in_array('OPT_SELECTOR_SINGLE_CAT', $camp_opt)){
-							break;
+							$extract = $extract[0];
+						}else{
+							$extract = implode(' ' , $extract);
 						}
 						
 					}
-					
-					
 					
 					if(trim($extract) == ''){
 						echo '<br>Nothing found to extract for this category rule';
@@ -1224,9 +1219,7 @@ function feed_process_link($feed, $camp) {
 						}
 					}
 				}
-				
-				$original_html_cat->clear();
-				unset($original_html_cat);
+			 
 				
 			}
 			
@@ -1238,67 +1231,64 @@ function feed_process_link($feed, $camp) {
 				
 			$cg_selector_tag=$camp_general['cg_custom_selector_tag'];
 			$cg_selecotr_data_tag=$camp_general['cg_feed_custom_id_tag'];
-
-			  echo ' for '.$cg_selector_tag . ' = '.$cg_selecotr_data_tag;
+			$inner = false;
 			 
 
-			//dom class
-			require_once 'inc/sxmldom_simple_html_dom.php';
+			echo ' for '.$cg_selector_tag . ' = '.$cg_selecotr_data_tag;
 
-			$original_html_tag = sxmldom_str_get_html($original_cont);
-				
-			unset($ret);
-			if(method_exists($original_html_tag, 'find')){
+			//dom class
+			if(! isset($wpAutomaticDom)){
+				require_once 'inc/class.dom.php';
+				$wpAutomaticDom = new wpAutomaticDom($original_cont);
+			}
+			
+			 
+			if(1){
 					
-				if($cg_selector_tag != 'xpath'){
-					$ret = $original_html_tag->find('*['.$cg_selector_tag.'='.trim($cg_selecotr_data_tag).']');
-				}else{
-					$ret = $original_html_tag->find( trim($cg_selecotr_data_tag) );
-				}
-					
+			  
 				$extract='';
 					
-				foreach ($ret as $itm ) {
-
-					if(in_array('OPT_SELECTOR_INNER_TAG', $camp_opt)){
-						$extract = $extract . $itm->innertext ;
-					}else{
-						$extract = $extract . $itm->outertext ;
-					}
-						
+				if ($cg_selector_tag == 'class') {
+					$extract = $wpAutomaticDom->getContentByClass ( $cg_selecotr_data_tag, $inner );
+				} elseif ($cg_selector_tag == 'id') {
+					$extract = $wpAutomaticDom->getContentByID ( $cg_selecotr_data_tag, $inner );
+				} elseif ($cg_selector_tag == 'xpath') {
+					$extract = $wpAutomaticDom->getContentByXPath ( stripslashes ( $cg_selecotr_data_tag ), $inner );
+				}
+				
+				if(is_array($extract)){
+					
 					if(in_array('OPT_SELECTOR_SINGLE_TAG', $camp_opt)){
-						break;
+						$extract = $extract[0];
+					}else{
+						$extract = implode(' ' , $extract);
 					}
-
+					
 				}
 					
-					
-					
+				  	
 				if(trim($extract) == ''){
 					  echo '<br>Nothing found to extract for this tag rule';
 				}else{
 					  echo '<br>Tag Rule extracted ' . strlen($extract) .' charchters ';
-					
-					  //echo $extract;
 					 
 						
 					if(stristr($extract, '<a')){
-						preg_match_all('{<a .*?>(.*?)</a}', $extract,$tags_matches);
-
+						preg_match_all('{<a .*?>(.*?)</a}su', $extract,$tags_matches);
+  
 						$tags_founds = $tags_matches[1];
 						$tags_founds = array_map('strip_tags', $tags_founds); 
 						 
 						$tags_str = implode(',', $tags_founds);
 
-						  echo ' found tags:'.$tags_str;
+						  echo ' Found tags:'.$tags_str;
 						 $res['tags'] =$tags_str;
 							
 					}
 				}
 			}
 
-			$original_html_tag->clear();
-			unset($original_html_tag);
+			 
 				
 		}elseif(in_array('OPT_ORIGINAL_TAGS', $camp_opt)){
 			
@@ -1313,38 +1303,42 @@ function feed_process_link($feed, $camp) {
 
 			$cg_selector_author=$camp_general['cg_custom_selector_author'];
 			$cg_selecotr_data_author=$camp_general['cg_feed_custom_id_author'];
+			$inner = false;
 
 			  echo ' for '.$cg_selector_author . ' = '.$cg_selecotr_data_author;
  
 				 
-			//dom class
-			require_once 'inc/sxmldom_simple_html_dom.php';
-			$original_html_author = sxmldom_str_get_html($original_cont);
- 
-			unset($ret);
-			if(method_exists($original_html_author, 'find')){
+			  //dom class
+			  if(! isset($wpAutomaticDom)){
+			  	require_once 'inc/class.dom.php';
+			  	$wpAutomaticDom = new wpAutomaticDom($original_cont);
+			  }
+			 
+			
+			
+			if(1){
 					
-				if($cg_selector_author != 'xpath'){
-					$ret = $original_html_author->find('*['.$cg_selector_author.'='.trim($cg_selecotr_data_author).']');
-				}else{
-					$ret = $original_html_author->find( trim($cg_selecotr_data_author) );
-				}
-					
+				
 				$extract='';
-					
-				foreach ($ret as $itm ) {
-
-					if(in_array('OPT_SELECTOR_INNER_AUTHOR', $camp_opt)){
-						$extract = $extract . $itm->innertext ;
-					}else{
-						$extract = $extract . $itm->outertext ;
-					}
-
-					if(in_array('OPT_SELECTOR_SINGLE_AUTHOR', $camp_opt)){
-						break;
-					}
-
+				
+				if ($cg_selector_author == 'class') {
+					$extract = $wpAutomaticDom->getContentByClass ( $cg_selecotr_data_author, $inner );
+				} elseif ($cg_selector_author == 'id') {
+					$extract = $wpAutomaticDom->getContentByID ( $cg_selecotr_data_author, $inner );
+				} elseif ($cg_selector_author == 'xpath') {
+					$extract = $wpAutomaticDom->getContentByXPath ( stripslashes ( $cg_selecotr_data_author ), $inner );
 				}
+				
+				if(is_array($extract)){
+					
+					if(in_array('OPT_SELECTOR_SINGLE_AUTHOR', $camp_opt)){
+						$extract = $extract[0];
+					}else{
+						$extract = implode(' ' , $extract);
+					}
+					
+				}
+				
 				
 				// Validate returned author
 				if(trim($extract) == ''){
@@ -1354,20 +1348,18 @@ function feed_process_link($feed, $camp) {
 					
 					 
 					if(stristr($extract, '<a')){
-						preg_match_all('{<a .*?>(.*?)</a}', $extract,$author_matches);
+						preg_match_all('{<a .*?>(.*?)</a}su', $extract,$author_matches);
 
 						$author_founds = $author_matches[1];
 						$author_str = strip_tags($author_founds[0]);
 
-						  echo ' found author:'.$author_str;
+						  echo ' Found author:'.$author_str;
 						$res['author'] =$author_str;
 					}
 
 				}
 				
-				// Finished author extraction let's clear simpleDom
-				$original_html_author->clear();
-				unset($original_html_author);
+			 
 			}
 
 
@@ -1520,13 +1512,12 @@ function feed_process_link($feed, $camp) {
 					 
 					 
 					// Read matches
-					       
 						foreach($matchregex_vals as $newmatch){
 					
 							if(trim($newmatch) !=''){
 								
 								
-								if(trim($finalmatch) !=''){
+								if(trim($finalmatch) ==''){
 									$finalmatch.=''.$newmatch;
 								}else{
 									
@@ -1545,8 +1536,7 @@ function feed_process_link($feed, $camp) {
 					
 						}
 				 
-					
-					
+					 
 					// Store field to be added
 					if(trim($finalmatch) != ''){
 						
@@ -1561,6 +1551,8 @@ function feed_process_link($feed, $camp) {
 						  
 						  
 					 	
+					}else{
+						echo '<-- Nothing found';
 					}
 					
 					
@@ -1618,7 +1610,7 @@ function feed_process_link($feed, $camp) {
 				if(trim($og_img) !=''){
 
 					$og_img_short = preg_replace('{http://.*?/}', '', $og_img);
-					echo ' :' . $og_img_short ;
+					echo  $og_img_short ;
 					if(trim($og_img_short) == ''){
 						$og_img_short = $og_img;
 					}
@@ -1675,22 +1667,23 @@ function feed_process_link($feed, $camp) {
 		//fix youtube no height embeds
 		if(stristr($res['cont'], 'youtube.com/embed')){
 			
-			preg_match_all('{<iframe[^>]*?youtube.com/embed.*?>}',$res['cont'],$yt_matches);
-			$yt_embeds = $yt_matches[0];
+			preg_match_all('{<iframe[^>]*?youtube.com/embed/(.*?)".*?>(?:</iframe>)?}',$res['cont'],$yt_matches);
 			
-			if(count($yt_embeds) > 0 ){
-				foreach ($yt_embeds as $embed){
+		  
+			$yt_matches_full = $yt_matches[0];
+			$yt_matches_ids = $yt_matches[1];
+			
+			
+			if(count($yt_matches_full) > 0 ){
+				
+				$i = 0;
+				foreach ($yt_matches_full as $embed){
 					
-					if(stristr($embed, 'width') && ! stristr($embed, 'height')){
-						
-						$correctedEmbed = str_replace('>', ' height="300px" >', $embed);
-						$res['cont'] = str_replace($embed, $correctedEmbed, $res['cont']);
-						echo '<br>Found YT embed without a height, setting a hiehg to 300px';
-					}elseif(stristr($embed, 'height="100%"')){
-						$correctedEmbed = str_replace('height="100%"', 'height="300px"', $embed);
-						$res['cont'] = str_replace($embed, $correctedEmbed, $res['cont']);
-						echo '<br>Found YT embed without a height, setting a hiehg to 300px';
-					}
+					echo '<br>Youtube video embed format changed to WordPress for video :'. $yt_matches_ids[$i]  ;
+					
+					$res['cont'] = str_replace($embed , '[embed]https://www.youtube.com/watch?v=' . $yt_matches_ids[$i]   . '[/embed]'  , $res['cont'] ) ;
+					
+					$i++;
 					
 				}
 			}

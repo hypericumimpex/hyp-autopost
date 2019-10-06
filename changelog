@@ -1,3 +1,18 @@
+@2 October v3.46.4
+Improved: Feeds/Multi-page scraper Youtube embeded videos now get changed to WordPress format 
+Fix: Feeds/Multi-page Strip parts using Class/ID now works correctly
+Fix: Feeds/Multi-page scraper srcset attribute relative images now get converted to full
+Fix: Youtube video duration format fix hours:minutes:seconds
+
+@1 October v3.46.3
+NEW: Feed/Multi-page Scraper new tag source_url_encoded
+Improved: Amazon importing without API major improvements and algorithm update 
+Improved: Image name from title now removes imojis
+Fix: custom extraction to tags now can extract multiple tags/categories
+Fix: seaprator in saved pin descriptions now display correctly
+Fix: Feed/Multi-page scraper extraction/removal by class now work for PHP 7.3
+
+
 @20 September v3.46.2
 Fix: Feed convert encoding now back to work 
 Fix: Amazon post without PA keys now work

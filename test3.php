@@ -1,20 +1,33 @@
 <?php
 
+$youtube_time = 'PT1H1S';
+
+$start = new DateTime('@0'); // Unix epoch
+$start->add(new DateInterval($youtube_time));
+echo  $start->format('H:i:s');
+
+exit;
+
+
+$exec = file_get_contents('test.txt');
+
+$doc = new DOMDocument ();
+@$doc->loadHTML ( $exec );
+
+$xpath = new DOMXpath ( $doc );
+
+// title
+$elements = $xpath->query ( '//*[@id="priceblock_saleprice"]' );
+
+var_dump($elements);
+
+exit;
+require_once('inc/class.dom.php');
+
  
+$wpAutomaticDom = new wpAutomaticDom(file_get_contents('test.txt'));
 
-$res['cont'] = '<div id="first">First</div> Second';
+  
+$items = $wpAutomaticDom->getContentByID('priceblock_saleprice');
 
-require_once 'inc/sxmldom_simple_html_dom.php';
-
-$original_html = sxmldom_str_get_html($res['cont']);
-
-echo $original_html;
-
-$finds = $original_html->find('*[id=first]');
-
-echo '<pre>';
-
-echo count($finds);
-
-print_r($finds);
-
+var_dump($items);

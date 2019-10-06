@@ -664,12 +664,13 @@ function youtube_get_post($camp) {
 							
 						//check contentdetails details
 						if( isset($theItem->contentDetails)){
-							$temp ['vid_duration'] = $theItem->contentDetails->duration;
 
-							$temp ['vid_duration'] = str_replace('PT', '', $temp ['vid_duration']);
-							$temp ['vid_duration'] = str_replace('M', ':', $temp ['vid_duration']);
-							$temp ['vid_duration'] = str_replace('H', ':', $temp ['vid_duration']);
-							$temp ['vid_duration'] = str_replace('S', '', $temp ['vid_duration']);
+							$youtube_time = $theItem->contentDetails->duration;
+							
+							$DTClass = new DateTime('@0'); // Unix epoch
+							$DTClass->add(new DateInterval($youtube_time));
+							$temp ['vid_duration'] = $DTClass->format('H:i:s');
+							 
 
 						}
 							

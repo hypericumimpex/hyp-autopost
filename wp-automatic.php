@@ -3,12 +3,12 @@
  Plugin Name: Wordpress Automatic Plugin
  Plugin URI: https://github.com/hypericumimpex/hyp-autopost/
  Description: WordPress Automatic posts quality articles, Amazon products, Clickbank products, Youtube videos, eBay items, Flickr images, RSS feeds posts on auto-pilot and much more.
- Version: 3.46.2
+ Version: 3.46.4
  Author: ValvePress
  Author URI: https://github.com/hypericumimpex/hyp-autopost?ref=HYP
  */
 
-/*  Copyright 2012-2017  Wordpress Automatic  (email : sweetheatmn@gmail.com) */
+/*  Copyright 2012-2019  Hypericum */
 
 global $wpAutomaticTemp; //temp var used for displaying columns of campsigns 
 global $wpAutomaticDemo;
